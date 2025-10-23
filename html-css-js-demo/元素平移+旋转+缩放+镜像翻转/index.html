@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>元素平移+旋转+缩放+镜像翻转</title>
+  <style>
+    .test-box {
+      width: 500px;
+      height: 500px;
+      border: 1px solid #CCC;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="test-box" id="eleBox"></div>
+  <div class="button-box">
+    <button id="addButton">新增</button>
+  </div>
+
+  <script>
+    // 抽离部分常量，方便维护
+    const INIT_WIDTH = 50;
+    const INIT_HEIGHT = 50;
+    const INIT_X = 10;
+    const INIT_Y = 10;
+    const INIT_COLOR = '#CCCCCC';
+    const ROTATE_W = 20;
+    const ROTATE_H = 20;
+    // 新增删除区域常量
+    const DEL_W = 20;
+    const DEL_H = 20;
+    // 新增缩放区域常量
+    const SCALE_W = 20;
+    const SCALE_H = 20;
+    const MIRROR_FLIP_W = 20;
+    const MIRROR_FLIP_H = 20;
+    const MIN_WIDTH = 40;
+    // 元素状态
+    const STATUS_MOVE = 'move';
+    const STATUS_ROTATE = 'rotate';
+    const STATUS_SCALE = 'scale';
+    const STATUS_DEL = 'del';
+    const STATUS_MIRROR_FLIP = 'mirrorFlip';
+    const MOVE_STATUS_ARRAY = [STATUS_MOVE, STATUS_ROTATE, STATUS_SCALE, null];
+    const DOWN_STATUS_ARRAY = [STATUS_DEL, STATUS_MIRROR_FLIP, null];
+
+    class EleDrop {
+      constructor(options) {
+        let {
+          id,
+          scrollLeft = 0,
+          scrollTop = 0,
+          itemFields = [],
+          zoneConf
+        } = options;
+
+        if (typeof id !== 'string' || id === '') {
+          throw new Error('请传入正确的容器id');
+        }
+
+        this.elementContainer = document.getElementById(id);
+
+        if (!this.elementContainer) {
+          throw new Error('未找到传入id的容器: ' + id);
+        }
+
+        this.elementContainer.style.position = 'relative';
+
+        // 容器元素的偏移量
+        this.offsetX = this.elementContainer.offsetLeft;
+        this.offsetY = this.elementContainer.offsetTop;
+        // 容器的宽高，不包含边框这些......
+        this.width = this.elementContainer.clientWidth;
+        this.height = this.elementContainer.clientHeight;
+        // 预留scroll，
+        // 如果页面存在滚动条的时候，
+        // 滚动条的位置也会影响点击的位置
+        this.scrollTop = scrollTop;
+        this.scrollLeft = scrollLeft;
+        this.startX = 0;
+        this.startY = 0;
+        this.currItem = null;
+        this.currItemStartOpt = null;
+        this.fnDown = (e) => this.handleDown(e);
+        this.fnMove = (e) => this.handleMove(e);
+        this.fnUp = (e) => this.handleUp(e);
+        this.itemFields = itemFields;
+
+        // 新增区域列表
+        this.zoneList = [
+          // 旋转区域
+          {
+            status: STATUS_ROTATE,
+            width: ROTATE_W,
+            height: ROTATE_H,
+            // xy 坐标比例
+            // 就是响应区域在元素内部所在中心点
+            // 例如元素整体宽高为20*20
+            // 我需要响应的中心点在(5,5)
+            // 那么比例就是 x: 5/20, y: 5/20
+            // 基于这个规则，我们就可以得到元素内部区域的任何位置
+            xRatio: 1,
+            yRatio: 0,
+            icon: './images/icon_rotate.png',
+            trigger: 'move'
+          },
+          // 设置删除区域
+          {
+            status: STATUS_DEL,
+            width: DEL_W,
+            height: DEL_H,
+            xRatio: 0,
+            yRatio: 0,
+            icon: './images/icon_delete.png',
+            trigger: 'down'
+          },
+          // 设置缩放区域
+          {
+            status: STATUS_SCALE,
+            width: SCALE_W,
+            height: SCALE_H,
+            xRatio: 1,
+            yRatio: 1,
+            icon: './images/icon_zoom.png',
+            trigger: 'move'
+          },
+          // 设置镜像翻转区域
+          {
+            status: STATUS_MIRROR_FLIP,
+            width: MIRROR_FLIP_W,
+            height: MIRROR_FLIP_H,
+            xRatio: 0,
+            yRatio: 1,
+            icon: './images/icon_flip.png',
+            trigger: 'down'
+          }
+        ];
+
+        if (zoneConf) this.handleZoneConf(zoneConf);
+
+        this.elementContainer.addEventListener('mousedown', this.fnDown);
+        document.addEventListener('mousemove', this.fnMove);
+        document.addEventListener('mouseup', this.fnUp);
+
+        const _this = this;
+
+        // 可以根据实际情况更改，
+        // 为了方便操作数组的时候自动调用更新，
+        // 后期融合到框架中可以删除
+        this.elementArray = new Proxy([], {
+          set(target, property, value, receiver) {
+            _this.render();
+            return Reflect.set(target, property, value, receiver);
+          }
+        });
+      }
+
+      /**
+       * 处理 zone 配置
+       *
+       * @param {Array} zoneConf zone 配置
+       */
+      handleZoneConf(zoneConf) {
+        if (!Array.isArray(zoneConf)) {
+          throw new Error('zoneConf 类型错误！');
+        }
+
+        zoneConf.forEach(conf => {
+          for (let i = 0, len = this.zoneList.length; i < len; i++) {
+            let zone = this.zoneList[i];
+
+            if (zone.status === conf.status) {
+              if (conf.use === false) {
+                this.zoneList.splice(i, 1);
+              } else {
+                let {
+                  status,
+                  width,
+                  height,
+                  xRatio,
+                  yRatio
+                } = conf;
+
+                if (
+                  status === null ||
+                  [
+                    ...MOVE_STATUS_ARRAY,
+                    ...DOWN_STATUS_ARRAY
+                  ].findIndex(o => o === status) === -1
+                ) {
+                  throw new Error('status 值错误: ' + status);
+                }
+
+                this.isNumber(width, 'width');
+                this.isNumber(height, 'height');
+                this.isNumber(xRatio, 'xRatio');
+                this.isNumber(yRatio, 'yRatio');
+
+                zone = Object.assign(zone, conf);
+              }
+              break;
+            }
+          }
+        });
+      }
+
+      isNumber(value, field) {
+        if (value !== undefined && typeof value !== 'number') {
+          throw new Error(`${field} 值类型错误，应该为 number 类型！传递的值为：${value}`);
+        }
+      }
+
+      /**
+       * 新增区域
+       * 可以自行添加响应的区域，然后执行对应的方法
+       *
+       * @param {*} zone 新增区域的属性描述
+       */
+      addZone(zone) {
+        let {
+          status,
+          width = 20,
+          height = 20,
+          xRatio,
+          yRatio,
+          icon,
+          trigger = 'move',
+          fn
+        } = zone;
+
+        if (
+          status === undefined ||
+          xRatio === undefined ||
+          yRatio === undefined ||
+          fn === undefined ||
+          icon === undefined
+        ) {
+          throw new Error('status, xRatio, yRatio, icon 和 fn 是必须的, 请检查这些字段是否填写准确！');
+        }
+
+        if (trigger !== 'move' && trigger !== 'down') {
+          throw new Error('trigger 字段的值只能是 move 和 down！');
+        }
+
+        if (
+          typeof width !== 'number' ||
+          typeof height !== 'number' ||
+          typeof xRatio !== 'number' ||
+          typeof yRatio !== 'number'
+        ) {
+          throw new Error('width, height, xRatio 和 yRatio 字段的值类型只能是 number！');
+        }
+
+        if (trigger === 'move') MOVE_STATUS_ARRAY.push(status);
+        else if (trigger === 'down') DOWN_STATUS_ARRAY.push(status);
+
+        this.zoneList.push({
+          status,
+          width,
+          height,
+          xRatio,
+          yRatio,
+          icon,
+          trigger,
+          fn
+        });
+      }
+
+      /**
+       * 清空数组
+       */
+      clear() {
+        this.elementArray.splice(0, this.elementArray.length);
+      }
+
+      /**
+       * 卸载
+       */
+      unload() {
+        this.elementContainer.removeEventListener('mousedown', this.fnDown);
+        document.removeEventListener('mousemove', this.fnMove);
+        document.removeEventListener('mouseup', this.fnUp);
+      }
+
+      /**
+       * 设置滚动条
+       *
+       * @param {Number} top 滚动条 top 值
+       * @param {Number} left 滚动条 left 值
+       */
+      setScroll(top, left) {
+        this.scrollLeft = left;
+        this.scrollTop = top;
+      }
+
+      /**
+       * 处理鼠标按下事件
+       *
+       * @param {*} e 事件参数
+       */
+      handleDown(e) {
+        // 为了兼容直接通过 clientX 与 clientY 计算，
+        // 只不过这样得让外界传递滚动条位置参数
+        //   如果元素的父级元素有几个都存在滚动条，
+        //   那么传递进来的就要是所有的滚动条位置参数相加
+        // 实际使用中就看实际情况了
+        const { clientX, clientY } = e;
+        let x = clientX - this.offsetX + this.scrollLeft;
+        let y = clientY - this.offsetY + this.scrollTop;
+
+        let currItem = null;
+        // 临时元素状态
+        let tempStatus = null;
+
+        // 记录初始点击坐标
+        this.startX = x;
+        this.startY = y;
+
+        this.elementArray.forEach(item => {
+          let status = this.isEleClickZone(x, y, item);
+
+          // 选中点击坐标下顶层元素
+          if (
+            (status && !currItem) ||
+            (status && currItem.zIndex < item.zIndex)
+          ) {
+            currItem = item;
+            tempStatus = status;
+          }
+        });
+
+        if (currItem && this.currItem && currItem.id === this.currItem.id) {
+          let fn = this.handleEleStatus(x, y)[tempStatus];
+
+          if (DOWN_STATUS_ARRAY.findIndex(s => s === tempStatus) > -1 && fn) {
+            fn();
+          } else {
+            for (let i = 0, len = this.zoneList.length; i < len; i++) {
+              const zone = this.zoneList[i];
+              if (zone.trigger !== 'down') continue;
+
+              if (tempStatus === zone.status && zone.trigger === 'down') {
+                zone.fn(x, y);
+                break;
+              };
+            }
+          }
+        }
+
+        if (currItem) {
+          this.currItem = currItem;
+          // 新增元素状态
+          this.currItem.status = tempStatus;
+          // 记录选中元素的部分参数，用于后面计算
+          this.currItemStartOpt = {
+            x: this.currItem.x,
+            y: this.currItem.y,
+            centerX: this.currItem.centerX,
+            centerY: this.currItem.centerY,
+            width: this.currItem.width,
+            height: this.currItem.height,
+            rotate: this.currItem.rotate
+          };
+        } else {
+          this.currItem = null;
+          this.currItemStartOpt = null;
+          this.render();
+        }
+      }
+
+      /**
+       * 处理鼠标移动事件
+       *
+       * @param {*} e 事件参数
+       */
+      handleMove(e) {
+        requestAnimationFrame(() => {
+          if (!this.currItem || !this.currItemStartOpt) return;
+
+          const { clientX, clientY } = e;
+          let x = clientX - this.offsetX + this.scrollLeft;
+          let y = clientY - this.offsetY + this.scrollTop;
+          let status = this.currItem.status;
+          let fn = this.handleEleStatus(x, y)[status];
+
+          if (MOVE_STATUS_ARRAY.findIndex(s => s === status) > -1 && fn) {
+            fn();
+          } else {
+            for (let i = 0, len = this.zoneList.length; i < len; i++) {
+              const zone = this.zoneList[i];
+              if (zone.trigger !== 'move') continue;
+
+              if (status === zone.status && zone.trigger === 'move') {
+                zone.fn(x, y);
+                break;
+              };
+            }
+          }
+        });
+      }
+
+      /**
+       * 处理鼠标按键松开
+       *
+       * @param {*} e 事件参数
+       */
+      handleUp(e) {
+        if (this.currItem) this.currItem.status = null;
+      }
+
+      /**
+       * 处理元素 status，对应的 status 做对应的事情
+       * 
+       * @param {Number} x 移动的 x 坐标
+       * @param {Number} y 移动的 y 坐标
+       */
+      handleEleStatus(x, y) {
+        return {
+          [STATUS_DEL]: () => this.handleEleDel(),
+          [STATUS_MOVE]: () => this.handleEleMove(x, y),
+          [STATUS_ROTATE]: () => this.handleEleRotate(x, y),
+          [STATUS_SCALE]: () => this.handleEleScale(x, y),
+          [STATUS_MIRROR_FLIP]: () => this.handleEleMirrorFlip()
+        }
+      }
+
+      /**
+       * 处理元素镜像翻转
+       */
+      handleEleMirrorFlip() {
+        this.currItem.mirrorFlip = !this.currItem.mirrorFlip;
+      }
+
+      /**
+       * 处理元素删除
+       */
+      handleEleDel() {
+        if (!this.currItem) return
+        let i = this.elementArray.findIndex(o => o.id === this.currItem.id);
+        if (i > -1) {
+          this.elementArray.splice(i, 1);
+        }
+      }
+
+      /**
+       * 处理元素缩放
+       *
+       * @param {Number} x 点击的 x 坐标
+       * @param {Number} y 点击的 y 坐标
+       */
+      handleEleScale(x, y) {
+        const currItem = this.currItem;
+        const {
+          x: oX,
+          y: oY,
+          width: oWidth,
+          height: oHeight
+        } = this.currItemStartOpt;
+
+        // 利用中心点计算鼠标移动前后点距离，
+        // 用于计算缩放比例，
+        // 再基于这个比例重新计算元素宽高
+        let lineStart = Math.sqrt(
+          Math.pow(currItem.centerX - this.startX, 2) +
+          Math.pow(currItem.centerY - this.startY, 2)
+        );
+        let lineEnd = Math.sqrt(
+          Math.pow(currItem.centerX - x, 2) +
+          Math.pow(currItem.centerY - y, 2)
+        );
+        // 计算宽高方法1
+        let resizeRaito = lineEnd / lineStart;
+        let newW = oWidth * resizeRaito;
+        let newH = oHeight * resizeRaito;
+
+        // // 计算新的宽高方法2
+        // let resize = lineEnd - lineStart;
+        // let newW = oWidth + resize * 2;
+        // let newH = oHeight * newW / oWidth;
+
+        // 以短边为基准来计算最小宽高
+        if (oWidth <= oHeight && newW < MIN_WIDTH) {
+          newW = MIN_WIDTH;
+          newH = MIN_WIDTH * oHeight / oWidth;
+        } else if (oHeight < oWidth && newH < MIN_WIDTH) {
+          newH = MIN_WIDTH;
+          newW = MIN_WIDTH * oWidth / oHeight;
+        }
+
+        // 以长边为基准来计算最大宽高
+        if (oWidth >= oHeight && newW >= this.width) {
+          newW = this.width;
+          newH = this.width * oHeight / oWidth;
+        } else if (oHeight > oWidth && newH >= this.height) {
+          newH = this.height;
+          newW = this.height * oWidth / oHeight;
+        }
+
+        currItem.width = Math.round(newW);
+        currItem.height = Math.round(newH);
+        currItem.x = Math.round(oX - (newW - oWidth) / 2);
+        currItem.y = Math.round(oY - (newH - oHeight) / 2);
+        // 重新计算元素的中心点坐标
+        currItem.centerX = currItem.x + currItem.width / 2;
+        currItem.centerY = currItem.y + currItem.height / 2;
+      }
+
+      /**
+       * 处理元素移动
+       *
+       * @param {Number} clientX
+       * @param {Number} clientY
+       */
+      handleEleMove(x, y) {
+        const temp = this.currItemStartOpt;
+
+        // 处理元素移动方法
+        // 通过鼠标点击位置来计算中心点，
+        //   再通过中心点去计算元素的 xy
+        // 不考虑边界情况的中心点坐标
+        let _centerX = temp.centerX + x - this.startX;
+        let _centerY = temp.centerY + y - this.startY;
+        // 最小中心点坐标，用于处理边界情况
+        let minCenterX = temp.width / 2;
+        let minCenterY = temp.height / 2;
+        // 最大中心点坐标，用于处理边界情况
+        let maxCenter = this.width - minCenterX;
+        let maxHeight = this.height - minCenterY;
+        // 最终计算出的中心点坐标
+        let centerX = _centerX >= maxCenter ?
+          maxCenter :
+          _centerX <= minCenterX ?
+            minCenterX : _centerX;
+        let centerY = _centerY >= maxHeight ?
+          maxHeight :
+          _centerY <= minCenterY ?
+            minCenterY : _centerY;
+
+        this.currItem.centerX = centerX;
+        this.currItem.centerY = centerY;
+        this.currItem.x = this.currItem.centerX - minCenterX;
+        this.currItem.y = this.currItem.centerY - minCenterY;
+      }
+
+      /**
+       * 处理元素变换
+       * 因为抽离功能后单一，所以更改函数名称，
+       * 涉及到的地方都要更改
+       *
+       * @param {Number} x
+       * @param {Number} y
+       */
+      handleEleRotate(x, y) {
+        const currItem = this.currItem;
+        const {
+          rotate: oRotate
+        } = this.currItemStartOpt;
+
+        // 计算旋转角度
+        let diffStartX = this.startX - currItem.centerX;
+        let diffStartY = this.startY - currItem.centerY;
+        let diffEndX = x - currItem.centerX;
+        let diffEndY = y - currItem.centerY;
+        let angleStart = Math.atan2(diffStartY, diffStartX) / Math.PI * 180;
+        let angleEnd = Math.atan2(diffEndY, diffEndX) / Math.PI * 180;
+
+        currItem.rotate = oRotate + angleEnd - angleStart;
+
+        // 抽离缩放逻辑，旋转就是单旋转
+        // this.handleEleScale(x, y);
+      }
+
+      /**
+       * 新增元素
+       *
+       * @param {Object} options 元素属性
+       */
+      addElement(options = {}) {
+        const item = this.handleOptions(options);
+
+        this.elementArray.push(item);
+      }
+
+      /**
+       * 处理元素属性
+       *
+       * @param {Object} options 元素属性
+       */
+      handleOptions(options = {}) {
+        const _options = {};
+        const _this = this;
+        const {
+          id,
+          width,
+          height,
+          x,
+          y,
+          backgroundColor,
+          zIndex
+        } = options;
+
+        _options.id = id ? id : Date.now();
+        _options.width = width ? width : INIT_WIDTH;
+        _options.height = height ? height : INIT_HEIGHT;
+        _options.x = x ? x : INIT_X;
+        _options.y = y ? y : INIT_Y;
+        _options.backgroundColor = backgroundColor ?
+          backgroundColor :
+          INIT_COLOR;
+        _options.square = [
+          [_options.x, _options.y],
+          [_options.x + _options.width, _options.y],
+          [_options.x + _options.width, _options.y + _options.height],
+          [_options.x, _options.y + _options.height]
+        ];
+        _options.centerX = _options.x + _options.width / 2;
+        _options.centerY = _options.y + _options.height / 2;
+        _options.zIndex = zIndex ? zIndex : _this.genZIndex();
+        // 新增元素状态，用于判断鼠标点击的是元素的什么位置，
+        // 好做出相应的操作
+        _options.status = null;
+        // 新增旋转角度
+        _options.rotate = 0;
+        // 镜像翻转
+        _options.mirrorFlip = false;
+
+        // 新增自定义字段
+        _this.itemFields.forEach(o => {
+          _options[o.field] = o.default;
+        });
+
+        // 当元素的属性发生更改的时候，重新执行渲染
+        // 当元素的 xy 发生改变的时候，重新计算顶点坐标
+        return new Proxy(_options, {
+          set(target, property, value, receiver) {
+            if (
+              property === 'x' ||
+              property === 'y'
+            ) {
+              _this.rotateSquare();
+            }
+
+            if (
+              property === 'status' &&
+              MOVE_STATUS_ARRAY.indexOf(value) === -1 &&
+              DOWN_STATUS_ARRAY.indexOf(value) === -1
+            ) {
+              throw new Error('元素状态设置错误：' + value);
+            }
+
+            _this.render();
+
+            return Reflect.set(target, property, value, receiver);
+          }
+        });
+      }
+
+      /**
+       * 生成元素数组中的 zIndex
+       *
+       * @return 返回最大 zIndex + 1
+       */
+      genZIndex() {
+        if (this.elementArray.length === 0) return 1;
+
+        let maxZIndex = Math.max(
+          ...this.elementArray.map(o => o.zIndex)
+        );
+
+        return maxZIndex + 1;
+      }
+
+      /**
+       * 渲染
+       */
+      render() {
+        // 因为加入镜像翻转，所以更改渲染结构
+        let str = '';
+
+        this.elementArray.forEach(item => {
+          let styleStr = `position:absolute;top:0;left:0;z-index:${item.zIndex};width:${item.width}px;height:${item.height}px;transform:translateX(${item.x}px) translateY(${item.y}px) translateZ(0px) rotate(${item.rotate}deg);`;
+
+          str += `
+            <div style="${styleStr}">
+              <div style="width:${item.width}px;height:${item.height}px;background-color:${item.backgroundColor};transform:rotateY(${item.mirrorFlip ? 180 : 0}deg);">9999</div>
+                ${this.currItem && this.currItem.id === item.id ?
+                  this.zoneList.map(o => {
+                    return `<div style="box-sizing:border-box;position:absolute;top:${item.height * o.yRatio - o.height / 2}px;left:${item.width * o.xRatio - o.width / 2}px;display:flex;align-items:center;justify-content:center;width:${o.width}px;height:${o.height}px;border:1px solid #666;border-radius:50%;">
+                          <img src="${o.icon}" style="width:80%;height:80%;-webkit-user-drag:none;-moz-user-drag:none;-ms-user-drag:none;user-drag:none;" />
+                        </div>
+                      `;
+                  }).join('') :
+                  ''
+                }
+            </div>
+          `;
+        });
+
+        this.elementContainer.innerHTML = str;
+      }
+
+      /** 
+        * 新增元素点击区域判断，对于不同的点击区响应不同的操作方法
+        * 为什么要新增这个函数？
+        *   因为常规的实现这些元素的操作，元素内部响应移动操作，
+        *   对于旋转等其他操作，一般就是元素的另外特定的区域，
+        *   当鼠标在这些特定的区域，为了响应对应的操作，
+        *   所以抽离成单独的函数
+        * @param {Number} x 点击的 x 坐标
+        * @param {Number} y 点击的 y 坐标
+        * @param {*} item 要判断的元素
+        * @return 不在元素任何区域内返回 false，在区域内返回相应的操作字符串
+        */
+      isEleClickZone(x, y, item) {
+        const zoneStatus = this.handleZone(x, y, item);
+
+        if (zoneStatus) return zoneStatus;
+        else if (this.insideEle(x, y, item)) return STATUS_MOVE;
+
+        // 不在元素区域里面并且不在元素操作按钮区域内
+        return false;
+      }
+
+      /**
+       * 处理响应区域
+       *
+       * @param {Number} x 点击的 x 坐标
+       * @param {Number} y 点击的 y 坐标
+       * @param {*} item 要判断响应区域的元素
+       * @return 在区域内返回区域定义的状态，不在则返回false
+       */
+      handleZone(x, y, item) {
+        let tempStatus = null;
+
+        for (let i = 0, len = this.zoneList.length; i < len; i++) {
+          const zone = this.zoneList[i];
+
+          let pos = this.rotatePoint(
+            item.x + item.width * zone.xRatio,
+            item.y + item.height * zone.yRatio,
+            item.centerX,
+            item.centerY,
+            item.rotate
+          );
+          let minX = pos[0] - zone.width / 2;
+          let minY = pos[1] - zone.height / 2;
+          let maxX = pos[0] + zone.width / 2;
+          let maxY = pos[1] + zone.height / 2;
+
+          if (
+            x >= minX &&
+            x <= maxX &&
+            y >= minY &&
+            y <= maxY
+          ) {
+            tempStatus = zone.status;
+            break;
+          }
+        }
+
+        return tempStatus;
+      }
+
+      /**
+       * 判断点击坐标是否在元素内
+       *
+       * @param {Number} x 点击 x 坐标
+       * @param {Number} y 点击 y 坐标
+       * @param {Object} item 要判断的元素
+       * @return 在元素内返回 true, 不在元素内返回 false
+       */
+      insideEle(x, y, item) {
+        const square = item.square;
+        let inside = false;
+
+        for (let i = 0, j = square.length - 1; i < square.length; j = i++) {
+          let xi = square[i][0];
+          let yi = square[i][1];
+          let xj = square[j][0];
+          let yj = square[j][1];
+          let intersect = yi > y != yj > y &&
+            x < (xj - xi) * (y - yi) / (yj - yi) + xi;
+
+          if (intersect) inside = !inside;
+        }
+
+        return inside;
+      }
+
+      /**
+       * 新增计算变换后的元素顶点坐标
+       * 因为要加入旋转，所以单独提出来
+       *
+       * @param {Number} x 元素 x 坐标
+       * @param {Number} y 元素 y 坐标
+       * @param {Number} centerX 元素中心点 x 坐标
+       * @param {Number} centerY 元素中心点 y 坐标
+       * @param {Number} degrees 元素旋转角度
+       * @return 返回计算好的顶点坐标数组
+       * @description
+       */
+      rotatePoint(x, y, centerX, centerY, degrees) {
+        let deg = degrees * Math.PI / 180;
+        let _x = (x - centerX) *
+          Math.cos(deg) -
+          (y - centerY) *
+          Math.sin(deg) +
+          centerX;
+        let _y = (x - centerX) *
+          Math.sin(deg) +
+          (y - centerY) *
+          Math.cos(deg) +
+          centerY;
+        return [_x, _y];
+      }
+
+      /**
+       * 重新计算当前元素的顶点坐标
+       */
+      rotateSquare() {
+        const currItem = this.currItem;
+
+        if (!currItem) return;
+
+        // 因为加入旋转，所以更改顶点计算方式
+        currItem.square = [
+          this.rotatePoint(
+            currItem.x,
+            currItem.y,
+            currItem.centerX,
+            currItem.centerY,
+            currItem.rotate
+          ),
+          this.rotatePoint(
+            currItem.x + currItem.width,
+            currItem.y,
+            currItem.centerX,
+            currItem.centerY,
+            currItem.rotate
+          ),
+          this.rotatePoint(
+            currItem.x + currItem.width,
+            currItem.y + currItem.height,
+            currItem.centerX,
+            currItem.centerY,
+            currItem.rotate
+          ),
+          this.rotatePoint(
+            currItem.x,
+            currItem.y + currItem.height,
+            currItem.centerX,
+            currItem.centerY,
+            currItem.rotate
+          )
+        ];
+      }
+    }
+
+    /***************************** 测试 *****************************/
+    const eleDrop = new EleDrop({
+      id: 'eleBox',
+      // // 测试区域按钮配置
+      // zoneConf: [{
+      //   status: 'mirrorFlip',
+      //   use: false
+      // }, {
+      //   status: 'rotate',
+      //   xRatio: 0,
+      //   yRatio: 0
+      // }]
+      // zoneConf: [
+      //   {
+      //     status: 'mirrorFlip',
+      //     use: false,
+      //   }
+      // ]
+    });
+
+    // eleDrop.addZone({
+    //   status: 'center',
+    //   xRatio: 1 / 2,
+    //   yRatio: 1 / 2,
+    //   trigger: 'down',
+    //   icon: './images/icon_center.png',
+    //   fn(x, y) {
+    //     console.log(x, y);
+    //     // 例如我想让元素移动到中心区
+    //     if (eleDrop.currItem) {
+    //       // 需要对里面封装的东西比较了解~
+    //       eleDrop.currItem.x = eleDrop.width / 2 - eleDrop.currItem.width / 2;
+    //       eleDrop.currItem.y = eleDrop.height / 2 - eleDrop.currItem.height / 2;
+    //       eleDrop.currItem.centerX = eleDrop.currItem.x + eleDrop.currItem.width / 2;
+    // 	    eleDrop.currItem.centerY = eleDrop.currItem.y + eleDrop.currItem.height / 2;
+    //       eleDrop.rotateSquare();
+    //     }
+    //   }
+    // });
+
+    // eleDrop.addZone({
+    //   status: 'center',
+    //   xRatio: 1 / 2,
+    //   yRatio: 1 / 2,
+    //   trigger: 'move',
+    //   icon: './images/icon_center.png',
+    //   fn(x, y) {
+    //     console.log(x, y);
+    //   }
+    // });
+
+    const addButton = document.getElementById('addButton');
+    addButton.addEventListener('click', () => {
+      eleDrop.addElement();
+    });
+  </script>
+</body>
+
+</html>

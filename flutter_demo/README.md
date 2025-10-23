@@ -14,4 +14,4 @@
 
 - 无缝滚动
 
-![tab部件封装案例](../demo-images/flutter-images/seamless_scrolling.gif)
+![无缝滚动](../demo-images/flutter-images/seamless_scrolling.gif)

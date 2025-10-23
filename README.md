@@ -14,9 +14,13 @@
 
 - 无缝滚动
 
-![tab部件封装案例](./demo-images/flutter-images/seamless_scrolling.gif)
+![无缝滚动](./demo-images/flutter-images/seamless_scrolling.gif)
 
 ## HTML CSS JS demo
+
+- 元素的移动、缩放、旋转、镜像翻转
+
+![元素的移动、缩放、旋转、镜像翻转](./demo-images/html-css-js-images/move_rotate_sacle_flip.gif)
 
 ## Uniapp demo
 
