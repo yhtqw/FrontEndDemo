@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../customize_tab/customize_tab_page.dart';
+import '../seamless_scrolling/seamless_scrolling_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -28,6 +29,12 @@ class _HomePageState extends State<HomePage> {
               context.push(CustomizeTabPage.routePath);
             },
             child: Text('封装一个tab部件'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              context.push(SeamlessScrollingPage.routePath);
+            },
+            child: Text('无缝滚动案例'),
           ),
         ],
       ),

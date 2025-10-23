@@ -12,6 +12,10 @@
 
 ![tab部件封装案例](./demo-images/flutter-images/customize_tab.gif)
 
+- 无缝滚动
+
+![tab部件封装案例](./demo-images/flutter-images/seamless_scrolling.gif)
+
 ## HTML CSS JS demo
 
 ## Uniapp demo
