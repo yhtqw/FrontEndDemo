@@ -4,6 +4,16 @@ import 'package:go_router/go_router.dart';
 import '../customize_tab/customize_tab_page.dart';
 import '../seamless_scrolling/seamless_scrolling_page.dart';
 
+class HomeRouteItem {
+  const HomeRouteItem({
+    required this.name,
+    required this.routePath,
+  });
+
+  final String name;
+  final String routePath;
+}
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -14,6 +24,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final List<HomeRouteItem> _list = [
+    HomeRouteItem(name: '封装一个tab部件', routePath: CustomizeTabPage.routePath,),
+    HomeRouteItem(name: '无缝滚动案例', routePath: SeamlessScrollingPage.routePath,),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -21,22 +36,29 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text('Flutter Demo'),
       ),
-      body: ListView(
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-        children: [
-          ElevatedButton(
-            onPressed: () {
-              context.push(CustomizeTabPage.routePath);
-            },
-            child: Text('封装一个tab部件'),
+      body: LayoutBuilder(
+        builder: (_, BoxConstraints boxConstraints) => GridView.builder(
+          padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 60,),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: boxConstraints.maxWidth < 600 ? 3 : boxConstraints.maxWidth < 1200 ? 5 : 8,
+            mainAxisSpacing: 15,
+            crossAxisSpacing: 15,
+            mainAxisExtent: 60,
           ),
-          ElevatedButton(
+          itemCount: _list.length,
+          itemBuilder: (_, int index) => ElevatedButton(
             onPressed: () {
-              context.push(SeamlessScrollingPage.routePath);
+              context.push(_list[index].routePath);
             },
-            child: Text('无缝滚动案例'),
+            child: Text(
+              _list[index].name,
+              style: TextStyle(
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
