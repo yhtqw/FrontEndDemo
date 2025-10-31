@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../customize_tab/customize_tab_page.dart';
 import '../seamless_scrolling/seamless_scrolling_page.dart';
+import '../transform_use/transform_use_page.dart';
 
 class HomeRouteItem {
   const HomeRouteItem({
@@ -27,6 +28,7 @@ class _HomePageState extends State<HomePage> {
   final List<HomeRouteItem> _list = [
     HomeRouteItem(name: '封装一个tab部件', routePath: CustomizeTabPage.routePath,),
     HomeRouteItem(name: '无缝滚动案例', routePath: SeamlessScrollingPage.routePath,),
+    HomeRouteItem(name: '容器内元素变换案例', routePath: TransformUsePage.routePath,),
   ];
 
   @override
