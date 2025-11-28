@@ -49,8 +49,6 @@ class _TransformContainerState extends State<TransformContainer> {
 
     String? tempStatus = _onDownZone(details.localPosition.dx, details.localPosition.dy);
 
-    print(tempStatus);
-
     setState(() {
       if (tempStatus == statusMove) {
         startPosition = details.globalPosition;
