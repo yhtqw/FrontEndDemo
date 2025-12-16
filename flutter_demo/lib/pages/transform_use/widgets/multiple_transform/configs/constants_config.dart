@@ -61,4 +61,14 @@ class ConstantsConfig {
   static const String initFontAlign = 'left';
   /// 文本属性部件的高度
   static const double fontOptionsWidgetHeight = 200;
+  /// 顶部工具栏高度
+  static const double topHeight = 60;
+  /// 网格线size
+  static const double gridSize = 15;
+  /// 网格线吸附阈值
+  static const double snapThreshold = 4;
+  /// 边界值比例
+  static const double boundaryRatio = 2;
+  /// 角度回正阈值
+  static const double angleThreshold = 5;
 }

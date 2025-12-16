@@ -67,7 +67,19 @@ class _TextOptionsState extends State<TextOptions> {
   }
 
   /// 新增文本元素
-  void _onAddTextElement(String text) {
+  void _onSubmitText(String text) {
+    if (text == '') return;
+
+    // 如果存在传入的文本属性，说明是编辑
+    if (widget.textOptions != null) {
+      widget.setTextOptions(
+        widget.textOptions!.copyWith(
+          text: text,
+        ),
+      );
+      return;
+    }
+
     // 一些初始化的文本属性
     TextStyle style = TextStyle(
       fontSize: ConstantsConfig.initFontSize,
@@ -94,7 +106,7 @@ class _TextOptionsState extends State<TextOptions> {
       widget.setTextOptions(
         widget.textOptions!.copyWith(
           textHeight: (
-            Decimal.parse('${widget.textOptions!.textHeight}') - Decimal.parse('0.1')
+              Decimal.parse('${widget.textOptions!.textHeight}') - Decimal.parse('0.1')
           ).toDouble(),
         ),
       );
@@ -106,7 +118,7 @@ class _TextOptionsState extends State<TextOptions> {
       widget.setTextOptions(
         widget.textOptions!.copyWith(
           textHeight: (
-            Decimal.parse('${widget.textOptions!.textHeight}') + Decimal.parse('0.1')
+              Decimal.parse('${widget.textOptions!.textHeight}') + Decimal.parse('0.1')
           ).toDouble(),
         ),
       );
@@ -118,7 +130,7 @@ class _TextOptionsState extends State<TextOptions> {
       widget.setTextOptions(
         widget.textOptions!.copyWith(
           letterSpacing: (
-            Decimal.parse('${widget.textOptions!.letterSpacing ?? 0}') - Decimal.parse('0.1')
+              Decimal.parse('${widget.textOptions!.letterSpacing ?? 0}') - Decimal.parse('0.1')
           ).toDouble(),
         ),
       );
@@ -130,7 +142,7 @@ class _TextOptionsState extends State<TextOptions> {
       widget.setTextOptions(
         widget.textOptions!.copyWith(
           letterSpacing: (
-            Decimal.parse('${widget.textOptions!.letterSpacing ?? 0}') + Decimal.parse('0.1')
+              Decimal.parse('${widget.textOptions!.letterSpacing ?? 0}') + Decimal.parse('0.1')
           ).toDouble(),
         ),
       );
@@ -142,7 +154,7 @@ class _TextOptionsState extends State<TextOptions> {
       widget.setTextOptions(
         widget.textOptions!.copyWith(
           fontSize: (
-            Decimal.parse('${widget.textOptions!.fontSize}') - Decimal.parse('1')
+              Decimal.parse('${widget.textOptions!.fontSize}') - Decimal.parse('1')
           ).toDouble(),
         ),
       );
@@ -154,7 +166,7 @@ class _TextOptionsState extends State<TextOptions> {
       widget.setTextOptions(
         widget.textOptions!.copyWith(
           fontSize: (
-            Decimal.parse('${widget.textOptions!.fontSize}') + Decimal.parse('1')
+              Decimal.parse('${widget.textOptions!.fontSize}') + Decimal.parse('1')
           ).toDouble(),
         ),
       );
@@ -242,7 +254,7 @@ class _TextOptionsState extends State<TextOptions> {
                       height: 1.2,
                     ),
                   ),
-                  onSubmitted: _onAddTextElement,
+                  onSubmitted: _onSubmitText,
                   onTapOutside: (event) {
                     FocusScopeNode currentFocus = FocusScope.of(context);
                     currentFocus.focusedChild?.unfocus();

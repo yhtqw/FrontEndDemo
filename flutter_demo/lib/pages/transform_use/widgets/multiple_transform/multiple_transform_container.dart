@@ -1,19 +1,24 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'all_optional_element_list.dart';
 import 'configs/constants_config.dart';
+import 'grid_painter.dart';
+import 'models/bar_model.dart';
 import 'models/element_model.dart';
 import 'models/response_area_model.dart';
 import 'text_options.dart';
 import 'transform_function_bar.dart';
 import 'transform_item.dart';
+import 'transform_top_bar.dart';
 import 'utils/transform_utils.dart';
 
 class MultipleTransformContainer extends StatefulWidget {
@@ -56,6 +61,11 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
   /// 是否展示文本属性部件
   bool _isShowTextOptions = false;
   bool _isLoading = false;
+  bool _useGrid = false;
+  bool _useAuxiliaryLine = false;
+  bool _usePosition = false;
+  bool _isMove = false;
+  List<ElementModel> _allOptionalElement = [];
 
   @override
   void initState() {
@@ -142,88 +152,46 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
 
   /// 按下事件
   void _onPanDown(DragDownDetails details) {
-    final double dx = details.localPosition.dx;
-    final double dy = details.localPosition.dy;
-
-    ElementModel? currentElement;
-    TemporaryModel temp = TemporaryModel(
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-      rotationAngle: 0,
-    );
-
-    // 遍历判断当前点击的位置是否落在了某个元素的响应区域，反序选择最顶层元素
-    // for (var item in _elementList) {
-    for (var i = (_elementList.length - 1); i >= 0; i--) {
-      final item = _elementList[i];
+    // 当存在选中元素的时候，记录点击点和初始化数据
+    if (_currentElement != null) {
+      final double dx = details.localPosition.dx;
+      final double dy = details.localPosition.dy;
       final (String, TriggerMethod)? status = _onDownZone(
         x: dx,
         y: dy,
-        item: item,
+        item: _currentElement!,
       );
 
-      if (status != null) {
-        currentElement = item;
-        temp = temp.copyWith(status: status.$1, trigger: status.$2);
-        break;
-      }
-    }
-
-    // 新增判断
-    // 如果当前有选中的元素且和点击区域的currentElement是一个元素
-    // 并且 temp 的 status对应的触发方式为点击，那么就响应对应的点击事件
-    if (currentElement?.id == _currentElement?.id && temp.trigger == TriggerMethod.down) {
-      final Function? fn = _onElementStatus(x: dx, y: dy)[temp.status];
-
-      if (fn != null) {
-        fn();
-      } else {
-        _onCustomFn(
-          element: currentElement!,
-          tapPoint: Offset(dx, dy),
-          status: temp.status,
-        );
-      }
-
-      if (temp.status == ElementStatus.deleteStatus.value) {
-        // 因为是删除，就置空选中，让下面代码执行最后的清除
-        currentElement = null;
-      }
-    }
-
-    if (currentElement != null) {
-      // 如果点击的区域存在元素，并且点击区域存在的元素和当前选中的元素不是一个
-      // 则选中该元素，并设置其部分初始化属性
-      if (_currentElement?.id != currentElement.id) {
-        _currentElement = currentElement;
-      }
-      _temporary = temp.copyWith(
-        x: currentElement.x,
-        y: currentElement.y,
-        width: currentElement.elementWidth,
-        height: currentElement.elementHeight,
-        rotationAngle: currentElement.rotationAngle,
+      _temporary = TemporaryModel(
+        x: _currentElement!.x,
+        y: _currentElement!.y,
+        width: _currentElement!.elementWidth,
+        height: _currentElement!.elementHeight,
+        rotationAngle: _currentElement!.rotationAngle,
+        status: status?.$1 ?? ElementStatus.move.value,
+        trigger: status?.$2 ?? TriggerMethod.move,
       );
       _startPosition = Offset(dx, dy);
+
       setState(() {});
-    } else {
-      // 如果点击的区域不存在元素，并且当前选中的元素不为null，则置空选中
-      if (_currentElement != null) {
-        _currentElement = null;
-        _temporary = null;
-        setState(() {});
-      }
     }
   }
 
   /// 按下移动事件
   void _onPanUpdate(DragUpdateDetails details) {
-    if (_currentElement == null || _temporary == null) return;
-
     final double x = details.localPosition.dx;
     final double y = details.localPosition.dy;
+
+    if (
+      _currentElement == null
+        || _temporary == null
+        || ((x - _startPosition.dx).abs() < 1 && (y - _startPosition.dy).abs() < 1 && !_isMove)
+    ) {
+      return;
+    }
+    // 新增一个判断，如果发生了一个单位的移动且移动状态未false，则标记移动为true
+    _isMove = true;
+
     final Function? fn = _onElementStatus(x: x, y: y)[_temporary?.status];
 
     if (_temporary?.trigger == TriggerMethod.move) {
@@ -241,16 +209,98 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
   }
 
   /// 结束事件
-  void _onPanEnd() {
-    if (_currentElement?.type != ElementType.textType.type) {
+  void _onPanEnd(DragEndDetails details) {
+    final double dx = details.localPosition.dx;
+    final double dy = details.localPosition.dy;
+
+    // 每次结束后置空选中
+    setState(() {
+      _allOptionalElement.clear();
+    });
+    ElementModel? currentElement;
+
+    // 判断抬起点的区域是否存在元素
+    for (var i = (_elementList.length - 1); i >= 0; i--) {
+      final item = _elementList[i];
+      final (String, TriggerMethod)? status = _onDownZone(
+        x: dx,
+        y: dy,
+        item: item,
+      );
+
+      if (status != null) {
+        _allOptionalElement.add(item);
+        currentElement ??= item;
+        // break;
+      }
+    }
+
+    if (_currentElement == null && currentElement != null) {
+      // 如果不存在当前元素，但是抬起的区域内存在元素，
+      // 则选中这个元素
+      _currentElement = currentElement;
+      setState(() {});
+    } else {
+      if (!_isMove) {
+        if (currentElement == null) {
+          // 如果抬起的区域内不存在任何的元素，
+          // 则说明是空白区域，这执行清空
+          _clean();
+        } else {
+          if (currentElement.id == _currentElement?.id) {
+            // 如果响应区域的元素和选中的元素是同一个，
+            // 则判断点击区域，如果点击区域是响应down的区域，
+            // 则执行对应的down方法
+            final (String, TriggerMethod)? status = _onDownZone(
+              x: dx,
+              y: dy,
+              item: _currentElement!,
+            );
+
+            if (status != null && status.$2 == TriggerMethod.down) {
+              final Function? fn = _onElementStatus(x: dx, y: dy)[status.$1];
+
+              if (fn != null) {
+                fn();
+              } else {
+                _onCustomFn(
+                  element: _currentElement!,
+                  tapPoint: Offset(dx, dy),
+                  status: status.$1,
+                );
+              }
+
+              if (status.$1 == ElementStatus.deleteStatus.value) {
+                // 因为是删除，就置空选中，让下面代码执行最后的清除
+                _clean();
+              }
+            } else {
+              // 如果不存在down方法，则说明是二次点击，
+              // 则取消选中
+              _clean();
+            }
+          } else {
+            // 如果不是同一个元素，则选中另外的那个元素
+            _currentElement = currentElement;
+            setState(() {});
+          }
+        }
+      }
+    }
+
+    // 之前的逻辑
+    if (_currentElement?.type != ElementType.textType.type && _isShowTextOptions) {
       setState(() {
         _isShowTextOptions = false;
       });
-    } else if (_currentElement?.type == ElementType.textType.type) {
+    } else if (_currentElement?.type == ElementType.textType.type && !_isShowTextOptions) {
       setState(() {
         _isShowTextOptions = true;
       });
     }
+
+    // 重置移动状态
+    _isMove = false;
   }
 
   /// 优化处理函数
@@ -307,7 +357,10 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
   }
 
   /// 抽取获取缩放需要的基础参数
-  (double, double, double, double, double) _getScaleParams({required double x, required double y}) {
+  (double, double, double, double, double) _getScaleParams({
+    required double x,
+    required double y,
+  }) {
     final double oWidth = _temporary!.width;
     final double oHeight = _temporary!.height;
     final double oX = _temporary!.x;
@@ -408,8 +461,26 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
     );
     final double angleEnd = atan2(y - centerY, x - centerX);
 
+    double angle = _temporary!.rotationAngle + angleEnd - angleStart;
+    if (angle < 0) {
+      angle += 2 * pi;
+    }
+
+    final double angleThreshold = pi / 180 * ConstantsConfig.angleThreshold;
+
+    // 在特殊角度处
+    if ((angle - pi / 2).abs() <= angleThreshold) {
+      angle = pi / 2;
+    } else if ((angle - pi).abs() <= angleThreshold) {
+      angle = pi;
+    } else if ((angle - pi * 3 / 2).abs() <= angleThreshold) {
+      angle = pi * 3 / 2;
+    } else if ((angle - pi * 2).abs() <= angleThreshold || angle.abs() <= angleThreshold) {
+      angle = 0;
+    }
+
     _currentElement = _currentElement!.copyWith(
-      rotationAngle: _temporary!.rotationAngle + angleEnd - angleStart,
+      rotationAngle: angle,
     );
     _onChange();
   }
@@ -421,28 +492,115 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
     double tempX = _temporary!.x + x - _startPosition.dx;
     double tempY = _temporary!.y + y - _startPosition.dy;
 
-    // 限制左边界
-    if (tempX < 0) {
-      tempX = 0;
+    if (_useGrid) {
+      (tempX, tempY) = _getUseGridXY(x: tempX, y: tempY);
     }
-    // 限制右边界
-    if (tempX > _transformWidth - _currentElement!.elementWidth) {
-      tempX = _transformWidth - _currentElement!.elementWidth;
-    }
-    // 限制上边界
-    if (tempY < 0) {
-      tempY = 0;
-    }
-    // 限制下边界
-    if (tempY > _transformHeight - _currentElement!.elementHeight) {
-      tempY = _transformHeight - _currentElement!.elementHeight;
-    }
+
+    (tempX, tempY) = _getMoveBoundary(x: tempX, y: tempY);
 
     _currentElement = _currentElement!.copyWith(
       x: tempX,
       y: tempY,
     );
     _onChange();
+  }
+
+  /// 获取开启网格辅助线时低于阈值的x和y
+  ///
+  /// 通过当前的[x]坐标和[y]坐标计算吸附坐标，如果低于阈值，则不吸附
+  (double, double) _getUseGridXY({required double x, required double y}) {
+    double tempX = x;
+    double tempY = y;
+    final double gridSize = ConstantsConfig.gridSize;
+    // 吸附的阈值
+    final double snapThreshold = ConstantsConfig.snapThreshold;
+    // 当旋转的移动过程中，计算出来的x和y其实就是原始矩形的x和y
+    // 所以此时我们将item的x和y改成计算出来的，通过这个来计算真实的顶点
+    final (leftTop, leftBottom, rightBottom, rightTop) = _getElementVertex(
+      item: _currentElement!.copyWith(x: x, y: y),
+    );
+    final List<Offset> vertexList = [
+      leftTop,
+      leftBottom,
+      rightBottom,
+      rightTop
+    ];
+    final (minDx, minDy, maxDx, maxDy) = _getExtremeVertex(
+      vertexList: vertexList,
+    );
+
+    // 计算最近（最小顶点坐标点）的网格点
+    double snappedLeftX = (minDx / gridSize).roundToDouble() * gridSize;
+    double snappedLeftY = (minDy / gridSize).roundToDouble() * gridSize;
+    // 计算最近（最大顶点坐标点）的网格点
+    double snappedRightX = (maxDx / gridSize).roundToDouble() * gridSize;
+    double snappedRightY = (maxDy / gridSize).roundToDouble() * gridSize;
+
+    // 检查是否在吸附范围内
+    double dxLeftDistance = minDx - snappedLeftX;
+    double dyLeftDistance = minDy - snappedLeftY;
+    double dxRightDistance = maxDx - snappedRightX;
+    double dyRightDistance = maxDy - snappedRightY;
+    // 计算旋转中心
+    double cx = (maxDx - minDx) / 2 + minDx;
+    double cy = (maxDy - minDy) / 2 + minDy;
+    // 元素的一半宽高
+    double halfWidth = _currentElement!.elementWidth / 2;
+    double halfHeight = _currentElement!.elementHeight / 2;
+
+    if (!(minDx == snappedLeftX || maxDx == snappedRightX)) {
+      // 在X轴方向上应用吸附
+      if (dxLeftDistance.abs() < dxRightDistance.abs() && dxLeftDistance.abs() < snapThreshold) {
+        // 如果靠近左边且小于阈值，则吸附到左边
+        tempX = cx - dxLeftDistance - halfWidth;
+      } else if (dxRightDistance.abs() < dxLeftDistance.abs() && dxRightDistance.abs() < snapThreshold) {
+        // 如果靠近右边且小于阈值，则吸附到右边
+        tempX = cx - dxRightDistance - halfWidth;
+      }
+    }
+
+    if (!(minDy == snappedLeftY || maxDy == snappedRightY)) {
+      // 在Y轴方向上应用吸附
+      if (dyLeftDistance.abs() < dyRightDistance.abs() && dyLeftDistance.abs() < snapThreshold) {
+        // 如果靠近上面且小于阈值，则吸附到上面
+        tempY = cy - dyLeftDistance - halfHeight;
+      } else if (dyRightDistance.abs() < dyLeftDistance.abs() && dyRightDistance.abs() < snapThreshold) {
+        // 如果靠近下面且小于阈值，则吸附到下面
+        tempY = cy - dyRightDistance - halfHeight;
+      }
+    }
+
+    return (tempX, tempY);
+  }
+
+  /// 获取移动时的边界
+  ///
+  /// 通过当前移动的[x]坐标和[y]坐标来计算中心点是否达到边界，
+  /// 如果达到边界，则中心点坐标应用边界值
+  (double, double) _getMoveBoundary({required double x, required double y}) {
+    final double tempWidth = _currentElement!.elementWidth / ConstantsConfig.boundaryRatio;
+    final double tempHeight = _currentElement!.elementHeight / ConstantsConfig.boundaryRatio;
+    double centerX = x + tempWidth;
+    double centerY = y + tempHeight;
+
+    // 限制左边界
+    if (centerX < 0) {
+      centerX = 0;
+    }
+    // 限制右边界
+    if (centerX > _transformWidth) {
+      centerX = _transformWidth;
+    }
+    // 限制上边界
+    if (centerY < 0) {
+      centerY = 0;
+    }
+    // 限制下边界
+    if (centerY > _transformHeight) {
+      centerY = _transformHeight;
+    }
+
+    return (centerX - tempWidth, centerY - tempHeight);
   }
 
   /// 处理自定义事件
@@ -540,27 +698,10 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
     bool isInside = false;
 
     // 计算元素的四个顶点坐标
+    final squareRes = _getElementVertex(item: item);
+
     final List<Offset> square = [
-      _rotatePoint(
-        x: item.x,
-        y: item.y,
-        item: item,
-      ),
-      _rotatePoint(
-        x: item.x + item.elementWidth,
-        y: item.y,
-        item: item,
-      ),
-      _rotatePoint(
-        x: item.x + item.elementWidth,
-        y: item.y + item.elementHeight,
-        item: item,
-      ),
-      _rotatePoint(
-        x: item.x,
-        y: item.y + item.elementHeight,
-        item: item,
-      ),
+      squareRes.$1, squareRes.$2, squareRes.$3, squareRes.$4
     ];
 
     // 判断按下的坐标是否在元素内部
@@ -576,6 +717,83 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
     }
 
     return isInside;
+  }
+
+  /// 计算元素的顶点坐标
+  ///
+  /// 计算传入元素[item]的顶点坐标，返回顺序为左上，右上，右下，左下
+  (Offset, Offset, Offset, Offset) _getElementVertex({
+    required ElementModel item
+  }) {
+    // 计算元素的四个顶点坐标
+    return (
+      _rotatePoint(
+        x: item.x,
+        y: item.y,
+        item: item,
+      ),
+      _rotatePoint(
+        x: item.x + item.elementWidth,
+        y: item.y,
+        item: item,
+      ),
+      _rotatePoint(
+        x: item.x + item.elementWidth,
+        y: item.y + item.elementHeight,
+        item: item,
+      ),
+      _rotatePoint(
+        x: item.x,
+        y: item.y + item.elementHeight,
+        item: item,
+      ),
+    );
+  }
+
+  /// 获取顶点坐标中的最大xy和最小xy
+  ///
+  /// 通过顶点坐标列表[vertexList]对比出最大和最小
+  (double, double, double, double) _getExtremeVertex({
+    required List<Offset> vertexList
+  }) {
+    double minDx = vertexList[0].dx;
+    double minDy = vertexList[0].dy;
+    double maxDx = vertexList[3].dx;
+    double maxDy = vertexList[3].dy;
+
+    for (var item in vertexList) {
+      if (item.dx < minDx) {
+        minDx = item.dx;
+      } else if (item.dx > maxDx) {
+        maxDx = item.dx;
+      }
+      if (item.dy < minDy) {
+        minDy = item.dy;
+      } else if (item.dy > maxDy) {
+        maxDy = item.dy;
+      }
+    }
+
+    return (minDx, minDy, maxDx, maxDy);
+  }
+
+  /// 快速的获取元素的最小的顶点坐标值和最大的顶点坐标值
+  (double, double, double, double) get _elementVertex {
+    if (_currentElement == null) {
+      return (0, 0, _transformWidth, _transformHeight);
+    }
+
+    final (leftTop, rightTop, rightBottom, leftBottom) = _getElementVertex(
+      item: _currentElement!,
+    );
+    final List<Offset> vertexList = [
+      leftTop,
+      leftBottom,
+      rightBottom,
+      rightTop
+    ];
+
+    return _getExtremeVertex(vertexList: vertexList);
   }
 
   /// 判断点击落点是否在元素的某个操作区域
@@ -639,8 +857,9 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
   }
 
   void _addElement(ElementModel item) {
-    if (_currentElement != null) _currentElement = null;
-    if (_temporary != null) _temporary = null;
+    if (_currentElement != null) {
+      _clean();
+    }
     setState(() {
       _elementList.add(item);
       _currentElement = item;
@@ -654,7 +873,7 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
 
   /// 变换区域的高
   double get _transformHeight {
-    return _height - ConstantsConfig.bottomHeight;
+    return _height - ConstantsConfig.bottomHeight - ConstantsConfig.topHeight;
   }
 
   /// 最终容器的宽
@@ -736,7 +955,6 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
 
       return file.path;
     } catch (e) {
-      print('捕获失败: $e');
       rethrow;
     }
   }
@@ -746,21 +964,87 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
     _isLoading = true;
 
     if (_currentElement != null) {
-      setState(() {
-        _currentElement = null;
-      });
-    }
+      _clean();
 
-    if (_currentElement == null) {
+      Future.delayed(Duration(milliseconds: 200), () {
+        _isLoading = false;
+        _onSave();
+      });
+    } else {
       final String imagePath = await _getImagePath();
       final List<Map<String, dynamic>> tempStringList = _elementList.map((item) => ElementModel.toJson(item)).toList();
 
       widget.onSave(imgSrc: imagePath, data: jsonEncode(tempStringList));
 
       _isLoading = false;
-    } else {
-      _isLoading = false;
-      _onSave();
+    }
+  }
+
+  void _clean() {
+    _allOptionalElement.clear();
+    setState(() {
+      _currentElement = null;
+      _temporary = null;
+      _useGrid =  false;
+      _useAuxiliaryLine = false;
+      _usePosition = false;
+      _isShowTextOptions = false;
+    });
+  }
+
+  void _onChangeUseGrid() {
+    setState(() {
+      _useGrid = !_useGrid;
+    });
+  }
+
+  void _onChangeUseAuxiliaryLine() {
+    setState(() {
+      _useAuxiliaryLine = !_useAuxiliaryLine;
+    });
+  }
+
+  void _onChangeUsePosition() {
+    if (_currentElement == null) return;
+
+    setState(() {
+      _usePosition = !_usePosition;
+    });
+  }
+
+  /// 处理层级
+  void _onLevel(LevelType type) {
+    final index = _elementList.indexWhere((ele) => ele.id == _currentElement?.id);
+    if (index > -1) {
+      final len = _elementList.length;
+      final tempItem = _elementList[index];
+
+      if (type == LevelType.top && index != (len -1)) {
+        _elementList.removeAt(index);
+        _elementList.insert(len - 1, tempItem);
+        setState(() {});
+      } else if (type == LevelType.bottom && index != 0) {
+        _elementList.removeAt(index);
+        _elementList.insert(0, tempItem);
+        setState(() {});
+      } else if (type == LevelType.upper && index < (len -1)) {
+        _elementList[index] = _elementList[index + 1];
+        _elementList[index + 1] = tempItem;
+        setState(() {});
+      } else if (type == LevelType.next && index > 0) {
+        _elementList[index] = _elementList[index - 1];
+        _elementList[index - 1] = tempItem;
+        setState(() {});
+      }
+    }
+  }
+
+  void _selectedElement(ElementModel item) {
+    if (item.id != _currentElement?.id) {
+      setState(() {
+        _isShowTextOptions = false;
+        _currentElement = item;
+      });
     }
   }
 
@@ -781,49 +1065,119 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
               height: _height,
               child: Column(
                 children: [
+                  // 顶部功能区
+                  TransformTopBar(
+                    onSave: _onSave,
+                    onUseGrid: _onChangeUseGrid,
+                    useGrid: _useGrid,
+                    useAuxiliaryLine: _useAuxiliaryLine,
+                    onChangeUseAuxiliaryLine: _onChangeUseAuxiliaryLine,
+                    usePosition: _usePosition,
+                    onChangeUsePosition: _onChangeUsePosition,
+                    currentElement: _currentElement,
+                    onLevel: _onLevel,
+                  ),
+
+                  // 变换区域
                   RepaintBoundary(
                     key: _saveGlobalKey,
-                    // 变换区域
                     child: Container(
                       width: _transformWidth,
                       height: _transformHeight,
                       margin: EdgeInsets.symmetric(
                         horizontal: ConstantsConfig.transformMargin,
                       ),
-                      color: Colors.white,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                      ),
+                      clipBehavior: Clip.hardEdge,
                       child: GestureDetector(
                         onPanDown: _onPanDown,
                         onPanUpdate: _onPanUpdate,
-                        onPanEnd: (details) => _onPanEnd(),
-                        onPanCancel: _onPanEnd,
+                        onPanEnd: _onPanEnd,
+                        // onPanCancel: _onPanEnd,
                         child: Container(
                           width: _transformWidth,
                           height: _transformHeight,
                           color: Colors.transparent,
                           child: Stack(
                             children: [
+                              // 网格线
+                              if (_useGrid) CustomPaint(
+                                painter: GridPainter(),
+                                size: Size.infinite,
+                              ),
+
                               ..._elementList.map((item) => TransformItem(
                                 key: ValueKey('${item.id}'),
                                 elementItem: item,
                                 selected: item.id == _currentElement?.id,
                                 areaList: _areaList,
                               )),
+
+                              // 辅助线
+                              if (_useAuxiliaryLine) Positioned(
+                                top: 0,
+                                left: _elementVertex.$1,
+                                child: Container(
+                                  width: 1,
+                                  height: _transformHeight,
+                                  color: Colors.blueAccent,
+                                ),
+                              ),
+                              if (_useAuxiliaryLine) Positioned(
+                                top: _elementVertex.$2,
+                                left: 0,
+                                child: Container(
+                                  width: _transformWidth,
+                                  height: 1,
+                                  color: Colors.blueAccent,
+                                ),
+                              ),
+                              if (_useAuxiliaryLine) Positioned(
+                                top: 0,
+                                left: _elementVertex.$3,
+                                child: Container(
+                                  width: 1,
+                                  height: _transformHeight,
+                                  color: Colors.blueAccent,
+                                ),
+                              ),
+                              if (_useAuxiliaryLine) Positioned(
+                                top: _elementVertex.$4,
+                                left: 0,
+                                child: Container(
+                                  width: _transformWidth,
+                                  height: 1,
+                                  color: Colors.blueAccent,
+                                ),
+                              ),
                             ],
                           ),
                         ),
                       ),
                     ),
                   ),
+
                   // 底部功能区域
                   TransformFunctionBar(
                     transformWidth: _transformWidth,
                     transformHeight: _transformHeight,
                     addElement: _addElement,
                     onShowTextOptions: _onShowTextOptions,
-                    onSave: _onSave,
                   ),
                 ],
               ),
+            ),
+          ),
+
+          // 可选中的所有元素
+          if (_allOptionalElement.isNotEmpty && _allOptionalElement.length > 1) Positioned(
+            left: 5,
+            bottom: ConstantsConfig.fontOptionsWidgetHeight + 5,
+            child: AllOptionalElementList(
+              list: _allOptionalElement,
+              onSelected: _selectedElement,
             ),
           ),
 

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'configs/constants_config.dart';
 import 'image_element_add.dart';
 import 'models/element_model.dart';
-import 'save_button.dart';
 import 'text_element_add.dart';
 
 class TransformFunctionBar extends StatelessWidget {
@@ -13,7 +12,6 @@ class TransformFunctionBar extends StatelessWidget {
     required this.transformWidth,
     required this.transformHeight,
     required this.onShowTextOptions,
-    required this.onSave,
   });
 
   /// 变换区域的宽，用于计算选择元素的初始宽度
@@ -24,8 +22,7 @@ class TransformFunctionBar extends StatelessWidget {
   final Function(ElementModel) addElement;
   /// 是否展示文本属性弹框
   final Function(bool) onShowTextOptions;
-  /// 保存
-  final Function() onSave;
+
 
   @override
   Widget build(BuildContext context) {
@@ -45,10 +42,6 @@ class TransformFunctionBar extends StatelessWidget {
           // 文本新增
           TextElementAdd(
             onShowTextOptions: onShowTextOptions,
-          ),
-          // 保存
-          SaveButton(
-            onSave: onSave,
           ),
         ],
       ),
