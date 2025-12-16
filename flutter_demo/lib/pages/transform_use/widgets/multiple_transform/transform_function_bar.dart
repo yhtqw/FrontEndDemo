@@ -12,6 +12,10 @@ class TransformFunctionBar extends StatelessWidget {
     required this.transformWidth,
     required this.transformHeight,
     required this.onShowTextOptions,
+    required this.onExpandWidth,
+    required this.onReduceWidth,
+    required this.onExpandHeight,
+    required this.onReduceHeight,
   });
 
   /// 变换区域的宽，用于计算选择元素的初始宽度
@@ -22,26 +26,87 @@ class TransformFunctionBar extends StatelessWidget {
   final Function(ElementModel) addElement;
   /// 是否展示文本属性弹框
   final Function(bool) onShowTextOptions;
-
+  final Function() onExpandWidth;
+  final Function() onReduceWidth;
+  final Function() onExpandHeight;
+  final Function() onReduceHeight;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: ConstantsConfig.bottomHeight,
-      color: Colors.white60,
-      padding: EdgeInsets.symmetric(horizontal: 10,),
-      child: Row(
-        spacing: 10,
+      child: Column(
         children: [
-          // 图片新增
-          ImageElementAdd(
-            transformHeight: transformHeight,
-            transformWidth: transformWidth,
-            addElement: addElement,
+          SizedBox(height: 20,),
+
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                ElevatedButton(
+                  onPressed: onExpandWidth,
+                  child: Text(
+                    '扩展宽度',
+                    style: TextStyle(
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: onReduceWidth,
+                  child: Text(
+                    '缩小宽度',
+                    style: TextStyle(
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: onExpandHeight,
+                  child: Text(
+                    '扩展高度',
+                    style: TextStyle(
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: onReduceHeight,
+                  child: Text(
+                    '缩小高度',
+                    style: TextStyle(
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          // 文本新增
-          TextElementAdd(
-            onShowTextOptions: onShowTextOptions,
+
+          SizedBox(height: 10,),
+
+          Expanded(
+            child: Container(
+              color: Colors.white60,
+              padding: EdgeInsets.only(left: 10, right: 10, top: 10),
+              alignment: Alignment.topCenter,
+              child: Row(
+                spacing: 10,
+                children: [
+                  // 图片新增
+                  ImageElementAdd(
+                    transformHeight: transformHeight,
+                    transformWidth: transformWidth,
+                    addElement: addElement,
+                  ),
+                  // 文本新增
+                  TextElementAdd(
+                    onShowTextOptions: onShowTextOptions,
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

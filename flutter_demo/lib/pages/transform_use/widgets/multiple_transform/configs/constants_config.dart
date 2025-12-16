@@ -50,9 +50,9 @@ class ConstantsConfig {
     ),
   ];
   /// 底部功能区域的高度
-  static const double bottomHeight = 100;
+  static const double bottomHeight = 150;
   /// 变换区域的左右margin
-  static const double transformMargin = 20;
+  static const double transformMargin = 10;
   /// 初始化的文本大小
   static const double initFontSize = 12;
   /// 初始化的行高
@@ -71,4 +71,8 @@ class ConstantsConfig {
   static const double boundaryRatio = 2;
   /// 角度回正阈值
   static const double angleThreshold = 5;
+  /// 扩展宽高的步长比例
+  static const double expandSizeRatio = 0.1;
+  static const double minSizeRatio = 1;
+  static const double maxSizeRatio = 3;
 }

@@ -47,6 +47,10 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
   /// 用于获取容器的宽高
   final GlobalKey _multipleTransformContainerGlobalKey = GlobalKey();
   final List<ElementModel> _elementList = [];
+  final List<ElementModel> _allOptionalElement = [];
+  final ScrollController _scrollableX = ScrollController();
+  final ScrollController _scrollableY = ScrollController();
+
   /// 记录一份容器的宽高，用于没传递的时候有个真实的容器宽高
   double _containerWidth = 0;
   double _containerHeight = 0;
@@ -65,7 +69,8 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
   bool _useAuxiliaryLine = false;
   bool _usePosition = false;
   bool _isMove = false;
-  List<ElementModel> _allOptionalElement = [];
+  double _expandWidthRatio = 1;
+  double _expandHeightRatio = 1;
 
   @override
   void initState() {
@@ -151,7 +156,7 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
   }
 
   /// 按下事件
-  void _onPanDown(DragDownDetails details) {
+  void _onPanDown(PointerDownEvent details) {
     // 当存在选中元素的时候，记录点击点和初始化数据
     if (_currentElement != null) {
       final double dx = details.localPosition.dx;
@@ -178,7 +183,7 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
   }
 
   /// 按下移动事件
-  void _onPanUpdate(DragUpdateDetails details) {
+  void _onPanUpdate(PointerMoveEvent details) {
     final double x = details.localPosition.dx;
     final double y = details.localPosition.dy;
 
@@ -209,7 +214,7 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
   }
 
   /// 结束事件
-  void _onPanEnd(DragEndDetails details) {
+  void _onPanEnd(PointerUpEvent details) {
     final double dx = details.localPosition.dx;
     final double dy = details.localPosition.dy;
 
@@ -389,12 +394,12 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
     }
 
     // 以长边为基准来计算最大宽高
-    if (oWidth >= oHeight && newW >= _transformWidth) {
-      newW = _transformWidth;
-      newH = _transformWidth * oHeight / oWidth;
-    } else if (oHeight > oWidth && newH >= _transformHeight) {
-      newH = _transformHeight;
-      newW = _transformHeight * oWidth / oHeight;
+    if (oWidth >= oHeight && newW >= _expandTransformWidth) {
+      newW = _expandTransformWidth;
+      newH = _expandTransformWidth * oHeight / oWidth;
+    } else if (oHeight > oWidth && newH >= _expandTransformHeight) {
+      newH = _expandTransformHeight;
+      newW = _expandTransformHeight * oWidth / oHeight;
     }
 
     if (
@@ -427,8 +432,8 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
     }
 
     // 以长边为基准来计算最大宽高
-    if (oWidth >= oHeight && newW >= _transformWidth) {
-      newW = _transformWidth;
+    if (oWidth >= oHeight && newW >= _expandTransformWidth) {
+      newW = _expandTransformWidth;
     }
 
     final TextStyle style = _getTextStyle(_currentElement!.textOptions!);
@@ -498,11 +503,78 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
 
     (tempX, tempY) = _getMoveBoundary(x: tempX, y: tempY);
 
+    _onScroll(x: tempX, y: tempY);
+
     _currentElement = _currentElement!.copyWith(
       x: tempX,
       y: tempY,
     );
     _onChange();
+  }
+
+  /// 处理滚动
+  ///
+  /// 用当前元素的坐标[x]和[y]计算出最大最小的坐标值，
+  /// 用最大和最小坐标值确定滚动条的位置
+  _onScroll({required double x, required double y}) {
+    // 最开始的
+    final (prevLeftTop, prevLeftBottom, prevRightBottom, prevRightTop) = _getElementVertex(
+      item: _currentElement!,
+    );
+    final List<Offset> prevVertexList = [
+      prevLeftTop,
+      prevLeftBottom,
+      prevRightBottom,
+      prevRightTop
+    ];
+    final (prevMinDx, prevMinDy, prevMaxDx, prevMaxDy) = _getExtremeVertex(
+      vertexList: prevVertexList,
+    );
+
+    // 当前移动的
+    final (leftTop, leftBottom, rightBottom, rightTop) = _getElementVertex(
+      item: _currentElement!.copyWith(x: x, y: y),
+    );
+    final List<Offset> vertexList = [
+      leftTop,
+      leftBottom,
+      rightBottom,
+      rightTop
+    ];
+    final (minDx, minDy, maxDx, maxDy) = _getExtremeVertex(
+      vertexList: vertexList,
+    );
+
+    final double offsetX = _scrollableX.offset;
+    final double offsetY = _scrollableY.offset;
+    final double maxScrollX = _scrollableX.position.maxScrollExtent;
+    final double minScrollX = _scrollableX.position.minScrollExtent;
+    final double maxScrollY = _scrollableY.position.maxScrollExtent;
+    final double minScrollY = _scrollableY.position.minScrollExtent;
+
+    if (prevMinDx > minDx) {
+      // 左移
+      if (offsetX > minScrollX && offsetX > minDx) {
+        _scrollableX.jumpTo(offsetX - (prevMinDx - minDx));
+      }
+    } else if (prevMinDx < minDx) {
+      // 右移
+      if (offsetX < maxScrollX && offsetX < (maxDx - _transformWidth)) {
+        _scrollableX.jumpTo(offsetX + (minDx - prevMinDx));
+      }
+    }
+
+    if (prevMinDy > minDy) {
+      // 上移
+      if (offsetY > minScrollY && offsetY > minDy) {
+        _scrollableY.jumpTo(offsetY - (prevMinDy - minDy));
+      }
+    } else if (prevMinDy < minDy) {
+      // 下移
+      if (offsetY < maxScrollY && offsetY < (maxDy - _transformHeight)) {
+        _scrollableY.jumpTo(offsetY + (minDy - prevMinDy));
+      }
+    }
   }
 
   /// 获取开启网格辅助线时低于阈值的x和y
@@ -588,16 +660,16 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
       centerX = 0;
     }
     // 限制右边界
-    if (centerX > _transformWidth) {
-      centerX = _transformWidth;
+    if (centerX > _expandTransformWidth) {
+      centerX = _expandTransformWidth;
     }
     // 限制上边界
     if (centerY < 0) {
       centerY = 0;
     }
     // 限制下边界
-    if (centerY > _transformHeight) {
-      centerY = _transformHeight;
+    if (centerY > _expandTransformHeight) {
+      centerY = _expandTransformHeight;
     }
 
     return (centerX - tempWidth, centerY - tempHeight);
@@ -624,8 +696,8 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
           tapPoint: tapPoint,
           element: element,
           movePoint: movePoint,
-          containerHeight: _transformHeight,
-          containerWidth: _transformWidth,
+          containerHeight: _expandTransformHeight,
+          containerWidth: _expandTransformWidth,
         );
         _onChange(data: data);
       }
@@ -780,7 +852,7 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
   /// 快速的获取元素的最小的顶点坐标值和最大的顶点坐标值
   (double, double, double, double) get _elementVertex {
     if (_currentElement == null) {
-      return (0, 0, _transformWidth, _transformHeight);
+      return (0, 0, _expandTransformWidth, _expandTransformHeight);
     }
 
     final (leftTop, rightTop, rightBottom, leftBottom) = _getElementVertex(
@@ -871,9 +943,19 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
     return _width - ConstantsConfig.transformMargin * 2;
   }
 
+  /// 扩展变换区域的宽
+  double get _expandTransformWidth {
+    return _transformWidth * _expandWidthRatio;
+  }
+
   /// 变换区域的高
   double get _transformHeight {
     return _height - ConstantsConfig.bottomHeight - ConstantsConfig.topHeight;
+  }
+
+  /// 扩展变换区域的高
+  double get _expandTransformHeight {
+    return _transformHeight * _expandHeightRatio;
   }
 
   /// 最终容器的宽
@@ -1048,6 +1130,38 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
     }
   }
 
+  void _onExpandWidth() {
+    if (_expandWidthRatio < ConstantsConfig.maxSizeRatio) {
+      setState(() {
+        _expandWidthRatio += ConstantsConfig.expandSizeRatio;
+      });
+    }
+  }
+
+  void _onReduceWidth() {
+    if (_expandWidthRatio > ConstantsConfig.minSizeRatio) {
+      setState(() {
+        _expandWidthRatio -= ConstantsConfig.expandSizeRatio;
+      });
+    }
+  }
+
+  void _onExpandHeight() {
+    if (_expandHeightRatio < ConstantsConfig.maxSizeRatio) {
+      setState(() {
+        _expandHeightRatio += ConstantsConfig.expandSizeRatio;
+      });
+    }
+  }
+
+  void _onReduceHeight() {
+    if (_expandHeightRatio > ConstantsConfig.minSizeRatio) {
+      setState(() {
+        _expandHeightRatio -= ConstantsConfig.expandSizeRatio;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -1079,81 +1193,103 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
                   ),
 
                   // 变换区域
-                  RepaintBoundary(
-                    key: _saveGlobalKey,
-                    child: Container(
-                      width: _transformWidth,
-                      height: _transformHeight,
-                      margin: EdgeInsets.symmetric(
-                        horizontal: ConstantsConfig.transformMargin,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                      ),
-                      clipBehavior: Clip.hardEdge,
-                      child: GestureDetector(
-                        onPanDown: _onPanDown,
-                        onPanUpdate: _onPanUpdate,
-                        onPanEnd: _onPanEnd,
-                        // onPanCancel: _onPanEnd,
-                        child: Container(
-                          width: _transformWidth,
-                          height: _transformHeight,
-                          color: Colors.transparent,
-                          child: Stack(
-                            children: [
-                              // 网格线
-                              if (_useGrid) CustomPaint(
-                                painter: GridPainter(),
-                                size: Size.infinite,
-                              ),
+                  Container(
+                    width: _transformWidth,
+                    height: _transformHeight,
+                    margin: EdgeInsets.symmetric(
+                      horizontal: ConstantsConfig.transformMargin,
+                    ),
+                    // decoration: BoxDecoration(
+                    //   color: Colors.white,
+                    // ),
+                    // 处理横向
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      controller: _scrollableX,
+                      physics: _currentElement == null ? ClampingScrollPhysics() : NeverScrollableScrollPhysics(),
+                      // 纵向
+                      child: SingleChildScrollView(
+                        controller: _scrollableY,
+                        physics: _currentElement == null ? ClampingScrollPhysics() : NeverScrollableScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            RepaintBoundary(
+                              key: _saveGlobalKey,
+                              // child: GestureDetector(
+                              child: Listener(
+                                // onPanDown: _onPanDown,
+                                // onPanUpdate: _onPanUpdate,
+                                // onPanEnd: _onPanEnd,
+                                onPointerDown: _onPanDown,
+                                onPointerMove: _onPanUpdate,
+                                onPointerUp: _onPanEnd,
+                                // onPanCancel: _onPanEnd,
+                                child: Container(
+                                  width: _expandTransformWidth,
+                                  height: _expandTransformHeight,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                  ),
+                                  clipBehavior: Clip.hardEdge,
+                                  child: Stack(
+                                    children: [
+                                      // 网格线
+                                      if (_useGrid) CustomPaint(
+                                        painter: GridPainter(),
+                                        size: Size.infinite,
+                                      ),
 
-                              ..._elementList.map((item) => TransformItem(
-                                key: ValueKey('${item.id}'),
-                                elementItem: item,
-                                selected: item.id == _currentElement?.id,
-                                areaList: _areaList,
-                              )),
+                                      ..._elementList.map((item) => TransformItem(
+                                        key: ValueKey('${item.id}'),
+                                        elementItem: item,
+                                        selected: item.id == _currentElement?.id,
+                                        areaList: _areaList,
+                                      )),
 
-                              // 辅助线
-                              if (_useAuxiliaryLine) Positioned(
-                                top: 0,
-                                left: _elementVertex.$1,
-                                child: Container(
-                                  width: 1,
-                                  height: _transformHeight,
-                                  color: Colors.blueAccent,
+                                      // 辅助线
+                                      if (_useAuxiliaryLine) Positioned(
+                                        top: 0,
+                                        left: _elementVertex.$1,
+                                        child: Container(
+                                          width: 1,
+                                          height: _expandTransformHeight,
+                                          color: Colors.blueAccent,
+                                        ),
+                                      ),
+                                      if (_useAuxiliaryLine) Positioned(
+                                        top: _elementVertex.$2,
+                                        left: 0,
+                                        child: Container(
+                                          width: _expandTransformWidth,
+                                          height: 1,
+                                          color: Colors.blueAccent,
+                                        ),
+                                      ),
+                                      if (_useAuxiliaryLine) Positioned(
+                                        top: 0,
+                                        left: _elementVertex.$3,
+                                        child: Container(
+                                          width: 1,
+                                          height: _expandTransformHeight,
+                                          color: Colors.blueAccent,
+                                        ),
+                                      ),
+                                      if (_useAuxiliaryLine) Positioned(
+                                        top: _elementVertex.$4,
+                                        left: 0,
+                                        child: Container(
+                                          width: _expandTransformWidth,
+                                          height: 1,
+                                          color: Colors.blueAccent,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              if (_useAuxiliaryLine) Positioned(
-                                top: _elementVertex.$2,
-                                left: 0,
-                                child: Container(
-                                  width: _transformWidth,
-                                  height: 1,
-                                  color: Colors.blueAccent,
-                                ),
-                              ),
-                              if (_useAuxiliaryLine) Positioned(
-                                top: 0,
-                                left: _elementVertex.$3,
-                                child: Container(
-                                  width: 1,
-                                  height: _transformHeight,
-                                  color: Colors.blueAccent,
-                                ),
-                              ),
-                              if (_useAuxiliaryLine) Positioned(
-                                top: _elementVertex.$4,
-                                left: 0,
-                                child: Container(
-                                  width: _transformWidth,
-                                  height: 1,
-                                  color: Colors.blueAccent,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -1165,6 +1301,10 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
                     transformHeight: _transformHeight,
                     addElement: _addElement,
                     onShowTextOptions: _onShowTextOptions,
+                    onExpandHeight: _onExpandHeight,
+                    onExpandWidth: _onExpandWidth,
+                    onReduceHeight: _onReduceHeight,
+                    onReduceWidth: _onReduceWidth,
                   ),
                 ],
               ),
@@ -1183,7 +1323,7 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
 
           // 文本属性设置部件
           TextOptions(
-            transformWidth: _transformWidth,
+            transformWidth: _expandTransformWidth,
             isShow: _isShowTextOptions,
             textOptions: _currentElement?.textOptions,
             addElement: _addElement,
