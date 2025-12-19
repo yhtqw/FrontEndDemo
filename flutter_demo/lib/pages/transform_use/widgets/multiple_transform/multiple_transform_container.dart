@@ -65,11 +65,17 @@ class _MultipleTransformContainerState extends State<MultipleTransformContainer>
   /// 是否展示文本属性部件
   bool _isShowTextOptions = false;
   bool _isLoading = false;
+  /// 是否应用网格
   bool _useGrid = false;
+  /// 是否应用辅助线
   bool _useAuxiliaryLine = false;
+  /// 是否应用层级
   bool _usePosition = false;
+  /// 是否执行了移动
   bool _isMove = false;
+  /// 扩展宽度
   double _expandWidthRatio = 1;
+  /// 扩展高度
   double _expandHeightRatio = 1;
 
   @override
