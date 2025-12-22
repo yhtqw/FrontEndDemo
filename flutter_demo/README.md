@@ -23,3 +23,7 @@
 ![元素变换2](../demo-images/flutter-images/transform_element2.gif)
 
 ![元素变换3](../demo-images/flutter-images/transform_element3.gif)
+
+- 可过滤的选择器
+
+![可过滤的选择器案例](../demo-images/flutter-images/filter_dropdown.gif)
