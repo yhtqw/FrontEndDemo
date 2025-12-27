@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>无缝滚动</title>
+  <style>
+    .container {
+      overflow: hidden;
+      display: flex;
+      max-width: 800px;
+      margin-top: 100px;
+      padding: 20px;
+      background: #CCC;
+      border-radius: 20px;
+    }
+    .inner-container {
+      display: flex;
+      align-items: center;
+      height: 100px;
+      margin: 0 -10px;
+      transform: translateX(-0px);
+    }
+    .item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      width: 80px;
+      height: 100%;
+      margin: 0 10px;
+      background: #F0F0F0;
+      border-radius: 10px;
+      font-size: 24px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="container">
+    <div class="inner-container" id="innnerContainer">
+      <div class="item">1</div>
+      <div class="item">2</div>
+      <div class="item">3</div>
+      <div class="item">4</div>
+      <div class="item">5</div>
+      <div class="item">6</div>
+      <div class="item">7</div>
+      <div class="item">8</div>
+      <div class="item">9</div>
+      <div class="item">10</div>
+      <div class="item" id="firstItem">1</div>
+      <div class="item">2</div>
+      <div class="item">3</div>
+      <div class="item">4</div>
+      <div class="item">5</div>
+      <div class="item">6</div>
+      <div class="item">7</div>
+      <div class="item">8</div>
+    </div>
+  </div>
+
+  <script>
+    const container = document.getElementById('container');
+    const innnerContainer = document.getElementById('innnerContainer');
+    const firstItem = document.getElementById('firstItem');
+    let translateX = 0;
+    let animateId;
+
+    /**
+     * 处理滚动
+     */
+    function onInnerScroll() {
+      translateX += 2;
+      const innnerContainerStyle = window.getComputedStyle(innnerContainer);
+
+      if (translateX >= firstItem.offsetLeft + parseFloat(innnerContainerStyle.marginLeft)) {
+        translateX = 0;
+      }
+
+      innnerContainer.style.transform = `translateX(-${translateX}px)`;
+
+      animateId = requestAnimationFrame(onInnerScroll);
+    }
+    onInnerScroll();
+
+    container.addEventListener('mouseenter', () => {
+      cancelAnimationFrame(animateId);
+    });
+
+    container.addEventListener('mouseleave', onInnerScroll);
+  </script>
+</body>
+</html>

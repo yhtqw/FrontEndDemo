@@ -11,3 +11,7 @@
 - 元素的移动、缩放、旋转、镜像翻转
 
 ![元素的移动、缩放、旋转、镜像翻转](../demo-images/html-css-js-images/move_rotate_sacle_flip.gif)
+
+- 无缝滚动
+
+![元素的移动、缩放、旋转、镜像翻转](../demo-images/html-css-js-images/seamless_scrolling.gif)
