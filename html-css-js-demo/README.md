@@ -15,3 +15,7 @@
 - 无缝滚动
 
 ![元素的移动、缩放、旋转、镜像翻转](../demo-images/html-css-js-images/seamless_scrolling.gif)
+
+- 折叠
+
+![折叠](../demo-images/html-css-js-images/fold_demo.gif)

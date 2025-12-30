@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>折叠</title>
+  <style>
+    .fold-container {
+      margin-bottom: 20px;
+      padding: 20px;
+      background: #F0F0F0;
+      border-radius: 20px;
+      cursor: pointer;
+    }
+
+    .fold-title-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .fold-icon {
+      width: 7px;
+      height: 12px;
+      margin-left: 20px;
+      transition: transform .3s;
+    }
+
+    .fold-content-container {
+      overflow: hidden;
+      height: 0;
+      font-size: 14px;
+      line-height: 30px;
+      transition: height .3s;
+    }
+
+    .fold-content {
+      padding-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="fold-container">
+    <!-- 重要的内容展示 -->
+    <div class="fold-title-container">
+      <div>这是标题1</div>
+      <img src="./images/icon_arrow.png" alt="icon arrow" class="fold-icon">
+    </div>
+
+    <!-- 更多的详情内容 -->
+    <div class="fold-content-container">
+      <div class="fold-content">
+        <div>这是详情内容1</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fold-container">
+    <!-- 重要的内容展示 -->
+    <div class="fold-title-container">
+      <div>这是标题2</div>
+      <img src="./images/icon_arrow.png" alt="icon arrow" class="fold-icon">
+    </div>
+
+    <!-- 更多的详情内容 -->
+    <div class="fold-content-container">
+      <div class="fold-content">
+        <div>这是详情内容2</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const foldContainerList = document.querySelectorAll('.fold-container');
+
+    foldContainerList.forEach(item => {
+      item.addEventListener('click', () => {
+        // 通过折叠容器选中内部的内容区域
+        const foldContentContainer = item.querySelector('.fold-content-container');
+        // 通过折叠内容选中内容的包裹容器，用于获取高度设置到外层
+        const foldContent = item.querySelector('.fold-content');
+        // 通过折叠内容选中内部的箭头icon，用于添加动画
+        const foldIcon = item.querySelector('.fold-icon');
+
+        if (foldContentContainer.offsetHeight >= foldContent.offsetHeight) {
+          foldContentContainer.style.height = 0;
+          foldIcon.style.transform = 'rotate(0)';
+        } else {
+          foldContentContainer.style.height = foldContent.offsetHeight + 'px';
+          foldIcon.style.transform = 'rotate(90deg)';
+        }
+      });
+    });
+  </script>
+</body>
+
+</html>
