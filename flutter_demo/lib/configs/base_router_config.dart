@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../pages/ceiling_mount/ceiling_mount_page.dart';
 import '../pages/customize_tab/customize_tab_page.dart';
 import '../pages/filter_dropdown/filter_dropdown_page.dart';
 import '../pages/transform_use/transform_use_page.dart';
@@ -30,6 +31,10 @@ class BaseRouterConfig {
       GoRoute(
         path: FilterDropdownPage.routePath,
         builder: (BuildContext context, GoRouterState state) => FilterDropdownPage(),
+      ),
+      GoRoute(
+        path: CeilingMountPage.routePath,
+        builder: (BuildContext context, GoRouterState state) => CeilingMountPage(),
       ),
     ],
   );
