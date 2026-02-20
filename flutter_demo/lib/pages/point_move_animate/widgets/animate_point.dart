@@ -107,7 +107,6 @@ class _AnimatePointState extends State<AnimatePoint> with SingleTickerProviderSt
           double curvedT = Curves.easeOutBack.transform(subT);
           currentPos = Offset.lerp(widget.startPoint, _pMid, curvedT)!;
           currentAlpha = curvedT; // 0 -> 1
-          scale = curvedT * _baseScale; // 0 -> _baseScale
         } else if (t < flyStart) {
           // // --- 中间停顿阶段：悬浮在散开点等待起飞 ---
           currentPos = _pMid;
