@@ -27,3 +27,7 @@
 - 可过滤的选择器
 
 ![可过滤的选择器案例](../demo-images/flutter-images/filter_dropdown.gif)
+
+- 元素位移动画
+
+![元素位移动画](../demo-images/flutter-images/animate_point.gif)
