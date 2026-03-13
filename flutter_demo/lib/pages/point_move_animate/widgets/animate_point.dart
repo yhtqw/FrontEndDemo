@@ -107,19 +107,19 @@ class _AnimatePointState extends State<AnimatePoint> with SingleTickerProviderSt
           double curvedT = Curves.easeOutBack.transform(subT);
           currentPos = Offset.lerp(widget.startPoint, _pMid, curvedT)!;
           currentAlpha = curvedT; // 0 -> 1
-          scale = curvedT * 1.4; // 0 -> 1.4
+          scale = curvedT * _baseScale; // 0 -> 1.4
         } else if (t < flyStart) {
           // // --- 中间停顿阶段：悬浮在散开点等待起飞 ---
           currentPos = _pMid;
         } else if (t < _animateEnd) {
           // --- 第二阶段：异步吸入 (flyStart -> _animateEnd) ---
           double subT = (t - flyStart) / (_animateEnd - flyStart);
-          double curvedT = Curves.easeOutQuart.transform(subT);
+          double curvedT = Curves.easeIn.transform(subT);
           currentPos = _calculateBezierPath(curvedT, _pMid, _controlPoint, widget.endPoint);
         } else {
           // --- 最后阶段收尾
           currentPos = widget.endPoint;
-          double subT = (t - _animateEnd) / 0.1;
+          double subT = (t - _animateEnd) / (1 - _animateEnd);
           currentAlpha = 1.0 - subT;
           scale = (1.0 - subT) * _baseScale;
         }

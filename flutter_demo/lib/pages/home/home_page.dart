@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../ceiling_mount/ceiling_mount_page.dart';
 import '../customize_tab/customize_tab_page.dart';
+import '../drawing_related/drawing_related_page.dart';
 import '../filter_dropdown/filter_dropdown_page.dart';
 import '../point_move_animate/point_move_animate_page.dart';
 import '../seamless_scrolling/seamless_scrolling_page.dart';
@@ -35,6 +36,7 @@ class _HomePageState extends State<HomePage> {
     HomeRouteItem(name: '可过滤的下拉选择框', routePath: FilterDropdownPage.routePath,),
     HomeRouteItem(name: '吸顶效果', routePath: CeilingMountPage.routePath,),
     HomeRouteItem(name: '点移动动画', routePath: PointMoveAnimatePage.routePath,),
+    HomeRouteItem(name: '绘制相关', routePath: DrawingRelatedPage.routePath,),
   ];
 
   @override
