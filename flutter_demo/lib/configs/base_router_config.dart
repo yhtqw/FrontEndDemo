@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../pages/ceiling_mount/ceiling_mount_page.dart';
 import '../pages/customize_tab/customize_tab_page.dart';
+import '../pages/drawing_related/children_pages/particle_collision/particle_collision_page.dart';
 import '../pages/drawing_related/children_pages/widget_path_guide/widget_path_guide_page.dart';
 import '../pages/drawing_related/drawing_related_page.dart';
 import '../pages/filter_dropdown/filter_dropdown_page.dart';
@@ -49,7 +50,11 @@ class BaseRouterConfig {
           GoRoute(
             path: WidgetPathGuidePage.routePath,
             builder: (BuildContext context, GoRouterState state) => WidgetPathGuidePage(),
-          )
+          ),
+          GoRoute(
+            path: ParticleCollisionPage.routePath,
+            builder: (BuildContext context, GoRouterState state) => ParticleCollisionPage(),
+          ),
         ],
         builder: (BuildContext context, GoRouterState state) => DrawingRelatedPage(),
       ),

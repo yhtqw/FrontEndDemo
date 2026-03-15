@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'children_pages/particle_collision/particle_collision_page.dart';
 import 'children_pages/widget_path_guide/widget_path_guide_page.dart';
 
 class DrawingRelatedPage extends StatefulWidget {
@@ -32,6 +33,13 @@ class _DrawingRelatedPageState extends State<DrawingRelatedPage> {
                 context.push("${DrawingRelatedPage.routePath}${WidgetPathGuidePage.routePath}");
               },
               child: Text('组件的边框路径包裹动画'),
+            ),
+
+            ElevatedButton(
+              onPressed: () {
+                context.push("${DrawingRelatedPage.routePath}${ParticleCollisionPage.routePath}");
+              },
+              child: Text('粒子碰撞'),
             ),
           ],
         ),
