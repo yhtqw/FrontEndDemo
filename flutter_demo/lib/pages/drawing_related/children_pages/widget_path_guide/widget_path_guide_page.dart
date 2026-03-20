@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import './widgets/path_guide_wrapper/path_guide_wrapper.dart';
+// import './widgets/path_guide_wrapper/path_guide_wrapper.dart';
+import './widgets/path_guide_wrapper/path_guide_wrapper_01.dart';
 
 class WidgetPathGuidePage extends StatefulWidget {
   const WidgetPathGuidePage({super.key});
@@ -21,7 +22,7 @@ class _WidgetPathGuidePageState extends State<WidgetPathGuidePage> {
           children: [
             SizedBox(height: 50,),
 
-            PathGuideWrapper(
+            ...[1,2,3,4,5,6,7].map((item) => PathGuideWrapper(
               color: Colors.orange,
               strokeWidth: 6,
               trailLengthPercent: 0.4,
@@ -36,7 +37,7 @@ class _WidgetPathGuidePageState extends State<WidgetPathGuidePage> {
                   style: TextStyle(color: Colors.white, fontSize: 18),
                 ),
               ),
-            ),
+            )),
 
             SizedBox(height: 20,),
 
