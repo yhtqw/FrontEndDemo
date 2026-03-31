@@ -128,7 +128,6 @@ class _PathGuidePainter extends CustomPainter {
     final double trailLength = _totalLength * trailPercent;
     final double currentPos = _totalLength * animation.value;
 
-    // 保留你原本优秀的跨起点截取逻辑，这是最稳健的做法
     Path extractPath = Path();
     double start = currentPos - trailLength;
     if (start < 0) {

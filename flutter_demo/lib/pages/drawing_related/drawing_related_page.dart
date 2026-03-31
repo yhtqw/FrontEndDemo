@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'children_pages/particle_collision/particle_collision_optimization_page.dart';
 import 'children_pages/particle_collision/particle_collision_page.dart';
 import 'children_pages/widget_path_guide/widget_path_guide_page.dart';
 
@@ -39,7 +40,14 @@ class _DrawingRelatedPageState extends State<DrawingRelatedPage> {
               onPressed: () {
                 context.push("${DrawingRelatedPage.routePath}${ParticleCollisionPage.routePath}");
               },
-              child: Text('粒子碰撞'),
+              child: Text('粒子碰撞-初版'),
+            ),
+
+            ElevatedButton(
+              onPressed: () {
+                context.push("${DrawingRelatedPage.routePath}${ParticleCollisionOptimizationPage.routePath}");
+              },
+              child: Text('粒子碰撞-优化版'),
             ),
           ],
         ),

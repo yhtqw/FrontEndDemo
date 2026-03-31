@@ -57,7 +57,7 @@ class _ParticleCollisionPageState extends State<ParticleCollisionPage> with Sing
   late List<List<List<Particle>>> grid;
 
   // 初始化粒子个数
-  final int particleCount = 5000;
+  final int particleCount = 10000;
   // 网格大小
   final double gridSize = 60;
 
@@ -106,7 +106,7 @@ class _ParticleCollisionPageState extends State<ParticleCollisionPage> with Sing
             rand.nextDouble() * 2 - 1,
           ),
           color: Colors.primaries[rand.nextInt(Colors.primaries.length)],
-          size: rand.nextDouble() + 1,
+          size: 1,
         ),
       );
     }
